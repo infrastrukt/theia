@@ -15,33 +15,42 @@
  ********************************************************************************/
 
 import { ContainerModule } from 'inversify';
+import { TaskContribution } from '@theia/task/lib/browser';
 import { CommandContribution } from '@theia/core/lib/common';
-import { KeybindingContribution, KeybindingContext } from '@theia/core/lib/browser';
-import { CppCommandContribution } from './cpp-commands';
-
 import { LanguageClientContribution } from '@theia/languages/lib/browser';
-import { CppLanguageClientContribution } from './cpp-language-client-contribution';
-import { CppKeybindingContribution, CppKeybindingContext } from './cpp-keybinding';
-import { bindCppPreferences } from './cpp-preferences';
-import { CppBuildConfigurationsContributions, CppBuildConfigurationChanger, CppBuildConfigurationManager } from './cpp-build-configurations';
+import { VariableContribution } from '@theia/variable-resolver/lib/browser';
+import { KeybindingContribution, KeybindingContext } from '@theia/core/lib/browser';
 import { LanguageGrammarDefinitionContribution } from '@theia/monaco/lib/browser/textmate';
-import { CppGrammarContribution } from './cpp-grammar-contribution';
+import { CppBuildConfigurationsContributions, CppBuildConfigurationChanger, CppBuildConfigurationManager } from './cpp-build-configurations';
 import { CppBuildConfigurationsStatusBarElement } from './cpp-build-configurations-statusbar-element';
+import { CppKeybindingContribution, CppKeybindingContext } from './cpp-keybinding';
+import { CppLanguageClientContribution } from './cpp-language-client-contribution';
+import { CppBuildVariableContribution } from './cpp-build-variable-contribution';
+import { CppGrammarContribution } from './cpp-grammar-contribution';
+import { CppCommandContribution } from './cpp-commands';
+import { bindCppPreferences } from './cpp-preferences';
+import { CppBuildManager } from './cpp-build-manager';
+import { CppTaskProvider } from './cpp-task-provider';
 
 export default new ContainerModule(bind => {
     bind(CommandContribution).to(CppCommandContribution).inSingletonScope();
     bind(CppKeybindingContext).toSelf().inSingletonScope();
-    bind(KeybindingContext).toDynamicValue(context => context.container.get(CppKeybindingContext));
+    bind(KeybindingContext).toService(CppKeybindingContext);
     bind(KeybindingContribution).to(CppKeybindingContribution).inSingletonScope();
 
     bind(CppLanguageClientContribution).toSelf().inSingletonScope();
-    bind(LanguageClientContribution).toDynamicValue(ctx => ctx.container.get(CppLanguageClientContribution));
+    bind(LanguageClientContribution).toService(CppLanguageClientContribution);
 
+    bind(CppBuildManager).toSelf().inSingletonScope();
+    bind(CppTaskProvider).toSelf().inSingletonScope();
     bind(CppBuildConfigurationManager).toSelf().inSingletonScope();
     bind(CppBuildConfigurationChanger).toSelf().inSingletonScope();
+    bind(CppBuildVariableContribution).toSelf().inSingletonScope();
     bind(CppBuildConfigurationsContributions).toSelf().inSingletonScope();
-    bind(CommandContribution).to(CppBuildConfigurationsContributions).inSingletonScope();
 
+    bind(TaskContribution).toService(CppTaskProvider);
+    bind(VariableContribution).toService(CppBuildVariableContribution);
+    bind(CommandContribution).toService(CppBuildConfigurationsContributions);
     bind(LanguageGrammarDefinitionContribution).to(CppGrammarContribution).inSingletonScope();
 
     bind(CppBuildConfigurationsStatusBarElement).toSelf().inSingletonScope();

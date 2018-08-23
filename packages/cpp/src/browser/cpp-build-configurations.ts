@@ -14,14 +14,16 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { Command, CommandContribution, CommandRegistry, Event, Emitter } from '@theia/core';
-import { injectable, inject, postConstruct } from 'inversify';
-import { QuickOpenService } from '@theia/core/lib/browser/quick-open/quick-open-service';
-import { QuickOpenModel, QuickOpenItem, QuickOpenMode, } from '@theia/core/lib/browser/quick-open/quick-open-model';
-import { StorageService } from '@theia/core/lib/browser/storage-service';
-import { CppPreferences } from './cpp-preferences';
-import { FileSystem, FileSystemUtils } from '@theia/filesystem/lib/common';
 import URI from '@theia/core/lib/common/uri';
+import { injectable, inject, postConstruct } from 'inversify';
+import { StorageService } from '@theia/core/lib/browser/storage-service';
+import { Command, CommandContribution, CommandRegistry, Event, Emitter } from '@theia/core/lib/common';
+import { QuickOpenModel, QuickOpenItem, QuickOpenMode, } from '@theia/core/lib/browser/quick-open/quick-open-model';
+import { QuickOpenService } from '@theia/core/lib/browser/quick-open/quick-open-service';
+import { ProcessTaskConfiguration } from '@theia/task/lib/common/process/task-protocol';
+import { FileSystem, FileSystemUtils } from '@theia/filesystem/lib/common';
+import { CppBuildManager } from './cpp-build-manager';
+import { CppPreferences } from './cpp-preferences';
 
 export interface CppBuildConfiguration {
     /** Human-readable configuration name.  */
@@ -29,6 +31,14 @@ export interface CppBuildConfiguration {
 
     /** Base directory of this build.  */
     directory: string;
+
+    /** List of commands for this project (build, or others) */
+    commands?: { [key: string]: string };
+}
+
+export interface CppBuildTaskConfiguration extends ProcessTaskConfiguration<'cpp'> {
+    configuration: CppBuildConfiguration;
+    target?: string;
 }
 
 /** What we save in the local storage.  */
@@ -42,6 +52,7 @@ class SavedActiveBuildConfiguration {
  */
 @injectable()
 export class CppBuildConfigurationManager {
+
     @inject(StorageService)
     protected readonly storageService: StorageService;
 
@@ -206,7 +217,12 @@ export class CppBuildConfigurationChanger implements QuickOpenModel {
  */
 export const CPP_CHANGE_BUILD_CONFIGURATION: Command = {
     id: 'cpp.change-build-configuration',
-    label: 'C/C++: Change Build Configuration'
+    label: 'C/C++: Change Build Configuration',
+};
+
+export const CPP_BUILD_ACTIVE_CONFIGURATION: Command = {
+    id: 'cpp.build.active',
+    label: 'C/C++: Build Active Configuration',
 };
 
 @injectable()
@@ -215,9 +231,25 @@ export class CppBuildConfigurationsContributions implements CommandContribution 
     @inject(CppBuildConfigurationChanger)
     protected readonly cppChangeBuildConfiguration: CppBuildConfigurationChanger;
 
+    @inject(CppBuildManager)
+    protected readonly cppBuildManager: CppBuildManager;
+
+    @inject(CppBuildConfigurationManager)
+    protected readonly cppBuildConfigurationManager: CppBuildConfigurationManager;
+
     registerCommands(commands: CommandRegistry): void {
         commands.registerCommand(CPP_CHANGE_BUILD_CONFIGURATION, {
             execute: () => this.cppChangeBuildConfiguration.open()
+        });
+        commands.registerCommand(CPP_BUILD_ACTIVE_CONFIGURATION, {
+            isEnabled: () =>
+                this.cppBuildConfigurationManager.getActiveConfig() !== undefined,
+            execute: () => {
+                const config = this.cppBuildConfigurationManager.getActiveConfig()!;
+                this.cppBuildManager.runConfiguration(config, {
+                    target: '',
+                });
+            },
         });
     }
 }

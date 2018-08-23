@@ -15,7 +15,7 @@
  ********************************************************************************/
 
 import { injectable, inject } from 'inversify';
-import { Variable, VariableRegistry } from './variable';
+import { Variable, VariableRegistry, VariableContext } from './variable';
 
 /**
  * The variable resolver service should be used to resolve variables in strings.
@@ -34,11 +34,11 @@ export class VariableResolverService {
      * @returns promise resolved to the provided string with already resolved variables.
      * Never reject.
      */
-    async resolve(text: string): Promise<string> {
-        const variablesToValues = await this.resolveVariables(this.searchVariables(text));
+    async resolve(text: string, context?: VariableContext): Promise<string> {
+        const variablesToValues = await this.resolveVariables(this.searchVariables(text), context);
         const resolvedText = text.replace(VariableResolverService.VAR_REGEXP, (match: string, varName: string) => {
             const value = variablesToValues.get(varName);
-            return value ? value : match;
+            return typeof value === 'string' ? value : match;
         });
         return resolvedText;
     }
@@ -48,10 +48,10 @@ export class VariableResolverService {
      * @returns promise resolved to the provided string array with already resolved variables.
      * Never reject.
      */
-    async resolveArray(arr: string[]): Promise<string[]> {
+    async resolveArray(arr: string[], context?: VariableContext): Promise<string[]> {
         const result: string[] = [];
         for (let i = 0; i < arr.length; i++) {
-            result[i] = await this.resolve(arr[i]);
+            result[i] = await this.resolve(arr[i], context);
         }
         return result;
     }
@@ -77,12 +77,18 @@ export class VariableResolverService {
      * @returns promise resolved to the map of the variable name to its value.
      * Never reject.
      */
-    protected async resolveVariables(variables: Variable[]): Promise<Map<string, string>> {
+    protected async resolveVariables(variables: Variable[], context: VariableContext = {}): Promise<Map<string, string>> {
         const resolvedVariables: Map<string, string> = new Map();
-        const promises: Promise<any>[] = [];
+        const promises: Promise<any>[] = []; // tslint:disable-line:no-any
         variables.forEach(variable => {
-            const promise = Promise.resolve(variable.resolve()).then(value => {
-                if (value) {
+            if (
+                context && variable.contexts && // tslint:disable-next-line:no-any
+                variable.contexts.some(ctx => typeof context[ctx as any] === 'undefined')
+            ) {
+                return; // skip case where variable cannot be resolved
+            }
+            const promise = Promise.resolve(variable.resolve(context)).then(value => {
+                if (typeof value === 'string') {
                     resolvedVariables.set(variable.name, value);
                 }
             });

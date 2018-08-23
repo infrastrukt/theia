@@ -18,6 +18,12 @@ import { injectable, inject } from 'inversify';
 import { ILogger, Disposable, DisposableCollection, MaybePromise } from '@theia/core';
 
 /**
+ * This type should take Symbols as indexes.
+ * TODO: Wait for symbol as indexes patch (https://github.com/Microsoft/TypeScript/issues/1863) and enforce it in this interface
+ */
+export type VariableContext = any; // tslint:disable-line:no-any
+
+/**
  * Variable can be used inside of strings using ${variableName} syntax.
  */
 export interface Variable {
@@ -33,11 +39,16 @@ export interface Variable {
     readonly description?: string;
 
     /**
+     * Contexts this variable will need to work properly
+     */
+    readonly contexts?: (Symbol | string)[]
+
+    /**
      * Resolve to a string value of this variable or
      * `undefined` if variable cannot be resolved.
      * Never reject.
      */
-    resolve(): MaybePromise<string | undefined>;
+    resolve(context: VariableContext): MaybePromise<string | undefined>;
 }
 
 export const VariableContribution = Symbol('VariableContribution');
